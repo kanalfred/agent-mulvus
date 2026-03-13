@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #EEF2F8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top nav ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      padding: 14px 24px;
+      background: transparent;
+    }
+
+    #topbar .brand {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #1f1f1f;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── Home view ── */
+    #home-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 24px 80px;
+      gap: 0;
+    }
+
+    .greeting-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .star-icon {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .greeting-line h1 {
+      font-size: 2rem;
+      font-weight: 500;
+      color: #444746;
+    }
+
+    #home-view h2 {
+      font-size: 2rem;
+      font-weight: 600;
+      color: #1f1f1f;
+      margin-bottom: 32px;
+    }
+
+    /* ── Shared input card ── */
+    .input-card {
+      width: 100%;
+      max-width: 680px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      padding: 14px 16px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .input-card textarea {
+      width: 100%;
+      border: none;
+      outline: none;
+      resize: none;
+      font-size: 1rem;
+      font-family: inherit;
+      color: #1f1f1f;
+      background: transparent;
+      line-height: 1.5;
+      max-height: 160px;
+      overflow-y: auto;
+      padding: 0 4px;
+    }
+
+    .input-card textarea::placeholder { color: #9aa0a6; }
+
+    .input-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .send-btn {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .send-btn:hover:not(:disabled) { background: #1558b0; }
+    .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Suggestion chips ── */
+    #chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+      max-width: 680px;
+      width: 100%;
+    }
+
+    .chip {
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 20px;
+      padding: 8px 18px;
+      font-size: 0.875rem;
+      color: #1f1f1f;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      white-space: nowrap;
+    }
+
+    .chip:hover { background: #f1f3f4; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+    /* ── Chat view (hidden initially) ── */
+    #chat-view {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    #chat-view.active { display: flex; }
+
+    #messages {
+      flex: 1;
+      width: 100%;
+      max-width: 760px;
+      overflow-y: auto;
+      padding: 32px 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .msg {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .msg.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .avatar.user-av {
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    .avatar.ai-av {
+      background: transparent;
+      padding: 2px;
+    }
+
+    .msg-text {
+      max-width: 72%;
+      line-height: 1.65;
+      font-size: 0.97rem;
+      color: #1f1f1f;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .msg.user .msg-text {
+      background: #fff;
+      border-radius: 18px 18px 4px 18px;
+      padding: 10px 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+
+    .msg.error .msg-text {
+      color: #c62828;
+    }
+
+    /* ── Thinking dots ── */
+    #thinking {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      padding: 0 24px;
+      max-width: 760px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    #thinking.visible { display: flex; }
+
+    .dots span {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #9aa0a6;
+      animation: bounce 1.3s infinite ease-in-out;
+      margin: 0 2px;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40%           { transform: translateY(-5px); opacity: 1; }
+    }
+
+    /* ── Bottom input bar (chat view) ── */
+    #chat-input-wrap {
+      width: 100%;
+      max-width: 760px;
+      padding: 12px 24px 24px;
+    }
+
+    #chat-input-wrap .input-card {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="topbar">
+    <span class="brand">RAG Chat</span>
+  </div>
+
+  <!-- Home / landing -->
+  <div id="home-view">
+    <div class="greeting-line">
+      <svg class="star-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 2C14 2 15.2 9.8 18.5 13C21.8 16.2 28 14 28 14C28 14 21.8 15.2 18.5 18.5C15.2 21.8 14 28 14 28C14 28 12.8 21.8 9.5 18.5C6.2 15.2 0 14 0 14C0 14 6.2 12.8 9.5 9.5C12.8 6.2 14 2 14 2Z" fill="url(#starGrad)"/>
+        <defs>
+          <linearGradient id="starGrad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#4285F4"/>
+            <stop offset="33%" stop-color="#9B72CB"/>
+            <stop offset="66%" stop-color="#D96570"/>
+            <stop offset="100%" stop-color="#D2A012"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <h1>Hi alfred</h1>
+    </div>
+    <h2>Where should we start?</h2>
+
+    <div class="input-card" id="home-input-card">
+      <textarea id="home-question" rows="1" placeholder="Ask me anything…"></textarea>
+      <div class="input-card-footer">
+        <button class="send-btn" id="home-send-btn" title="Send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="chips">
+      <button class="chip">What is Milvus?</button>
+      <button class="chip">How does RAG work?</button>
+      <button class="chip">What is vector similarity search?</button>
+      <button class="chip">What embedding model is used?</button>
+    </div>
+  </div>
+
+  <!-- Chat view -->
+  <div id="chat-view">
+    <div id="messages"></div>
+    <div id="thinking">
+      <div class="avatar ai-av">
+        <svg width="22" height="22" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2C14 2 15.2 9.8 18.5 13C21.8 16.2 28 14 28 14C28 14 21.8 15.2 18.5 18.5C15.2 21.8 14 28 14 28C14 28 12.8 21.8 9.5 18.5C6.2 15.2 0 14 0 14C0 14 6.2 12.8 9.5 9.5C12.8 6.2 14 2 14 2Z" fill="url(#starGrad2)"/>
+          <defs>
+            <linearGradient id="starGrad2" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#4285F4"/>
+              <stop offset="33%" stop-color="#9B72CB"/>
+              <stop offset="66%" stop-color="#D96570"/>
+              <stop offset="100%" stop-color="#D2A012"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+    <div id="chat-input-wrap">
+      <div class="input-card">
+        <textarea id="chat-question" rows="1" placeholder="Ask a follow-up…"></textarea>
+        <div class="input-card-footer">
+          <button class="send-btn" id="chat-send-btn" title="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const homeView      = document.getElementById('home-view');
+    const chatView      = document.getElementById('chat-view');
+    const messagesEl    = document.getElementById('messages');
+    const thinkingEl    = document.getElementById('thinking');
+    const homeQuestion  = document.getElementById('home-question');
+    const homeSendBtn   = document.getElementById('home-send-btn');
+    const chatQuestion  = document.getElementById('chat-question');
+    const chatSendBtn   = document.getElementById('chat-send-btn');
+
+    let history = [];
+    let isLoading = false;
+
+    function switchToChat() {
+      homeView.style.display = 'none';
+      chatView.classList.add('active');
+    }
+
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function starSVG(size = 22) {
+      const id = 'sg' + Math.random().toString(36).slice(2);
+      return `<svg width="${size}" height="${size}" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 2C14 2 15.2 9.8 18.5 13C21.8 16.2 28 14 28 14C28 14 21.8 15.2 18.5 18.5C15.2 21.8 14 28 14 28C14 28 12.8 21.8 9.5 18.5C6.2 15.2 0 14 0 14C0 14 6.2 12.8 9.5 9.5C12.8 6.2 14 2 14 2Z" fill="url(#${id})"/>
+        <defs><linearGradient id="${id}" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#4285F4"/><stop offset="33%" stop-color="#9B72CB"/>
+          <stop offset="66%" stop-color="#D96570"/><stop offset="100%" stop-color="#D2A012"/>
+        </linearGradient></defs></svg>`;
+    }
+
+    function addUserMessage(text) {
+      const msg = document.createElement('div');
+      msg.className = 'msg user';
+      msg.innerHTML = `
+        <div class="avatar user-av">A</div>
+        <div class="msg-text">${escHtml(text)}</div>`;
+      messagesEl.appendChild(msg);
+      scrollToBottom();
+    }
+
+    function createAssistantMessage() {
+      const msg = document.createElement('div');
+      msg.className = 'msg assistant';
+      const textEl = document.createElement('div');
+      textEl.className = 'msg-text';
+      msg.innerHTML = `<div class="avatar ai-av">${starSVG()}</div>`;
+      msg.appendChild(textEl);
+      messagesEl.appendChild(msg);
+      scrollToBottom();
+      return textEl;
+    }
+
+    function addErrorMessage(text) {
+      const msg = document.createElement('div');
+      msg.className = 'msg error';
+      msg.innerHTML = `<div class="avatar ai-av">${starSVG()}</div><div class="msg-text">${escHtml(text)}</div>`;
+      messagesEl.appendChild(msg);
+      scrollToBottom();
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function setLoading(on) {
+      isLoading = on;
+      thinkingEl.classList.toggle('visible', on);
+      homeSendBtn.disabled = on;
+      chatSendBtn.disabled = on;
+      homeQuestion.disabled = on;
+      chatQuestion.disabled = on;
+    }
+
+    async function sendMessage(question) {
+      if (!question || isLoading) return;
+
+      switchToChat();
+      addUserMessage(question);
+      setLoading(true);
+
+      const textEl = createAssistantMessage();
+
+      try {
+        const res = await fetch('/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, history }),
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`Server error ${res.status}: ${err}`);
+        }
+
+        setLoading(false);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+
+          for (const part of parts) {
+            if (!part.trim()) continue;
+            const lines = part.split('\n');
+            const eventLine = lines.find(l => l.startsWith('event:'));
+            const dataLine  = lines.find(l => l.startsWith('data:'));
+            if (!dataLine) continue;
+
+            const payload = JSON.parse(dataLine.slice(5).trim());
+
+            if (eventLine && eventLine.includes('done')) {
+              history = payload.history;
+            } else if (eventLine && eventLine.includes('error')) {
+              throw new Error(payload.detail || 'Stream error');
+            } else {
+              textEl.textContent += payload.text;
+              scrollToBottom();
+            }
+          }
+        }
+
+        if (!textEl.textContent) textEl.closest('.msg').remove();
+      } catch (err) {
+        setLoading(false);
+        textEl.closest('.msg').remove();
+        addErrorMessage(`Error: ${err.message}`);
+      } finally {
+        setLoading(false);
+        chatQuestion.focus();
+      }
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    }
+
+    // Home input
+    homeSendBtn.addEventListener('click', () => {
+      const q = homeQuestion.value.trim();
+      homeQuestion.value = '';
+      sendMessage(q);
+    });
+
+    homeQuestion.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); homeSendBtn.click(); }
+    });
+
+    homeQuestion.addEventListener('input', () => autoResize(homeQuestion));
+
+    // Chat input
+    chatSendBtn.addEventListener('click', () => {
+      const q = chatQuestion.value.trim();
+      chatQuestion.value = '';
+      autoResize(chatQuestion);
+      sendMessage(q);
+    });
+
+    chatQuestion.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSendBtn.click(); }
+    });
+
+    chatQuestion.addEventListener('input', () => autoResize(chatQuestion));
+
+    // Suggestion chips
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => sendMessage(chip.textContent.trim()));
+    });
+  </script>
+</body>
+</html>
